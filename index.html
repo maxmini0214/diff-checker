@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diff Checker — Free Online Text Compare Tool</title>
+<meta name="description" content="Compare two texts and highlight differences instantly. Line-by-line and inline diff modes with color-coded additions, deletions, and changes. 100% client-side.">
+<meta name="keywords" content="diff checker, text compare, text diff, compare files, online diff tool, code diff">
+<meta property="og:title" content="Diff Checker — Free Online Text Compare Tool">
+<meta property="og:description" content="Compare two texts side by side. Highlight additions, deletions, and changes instantly.">
+<meta property="og:type" content="website">
+<link rel="canonical" href="https://maxmini0214.github.io/diff-checker/">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f0f23;--surface:#1a1a2e;--accent:#16213e;--primary:#6c5ce7;--primary-light:#a29bfe;--text:#eee;--text-dim:#888;--add-bg:#1e3a1e;--add-border:#2ed573;--del-bg:#3a1e1e;--del-border:#e94560;--chg-bg:#3a3a1e;--chg-border:#ffa502}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px;max-width:1200px;margin:0 auto}
+h1{font-size:1.6rem;text-align:center;margin-bottom:4px;background:linear-gradient(135deg,var(--primary),var(--primary-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{text-align:center;color:var(--text-dim);font-size:.85rem;margin-bottom:20px}
+.toolbar{display:flex;justify-content:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.btn{padding:8px 20px;border:none;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-light)}
+.btn-secondary{background:var(--accent);color:var(--text)}
+.btn-secondary:hover{background:#1e2a45}
+.btn-secondary.active{border:2px solid var(--primary);color:var(--primary)}
+.input-area{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.input-area label{font-size:.8rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;display:block}
+.input-area textarea{width:100%;height:260px;padding:12px;border:1px solid #333;border-radius:10px;background:var(--surface);color:var(--text);font-family:'SF Mono',Consolas,monospace;font-size:.85rem;resize:vertical;line-height:1.5}
+.input-area textarea:focus{outline:none;border-color:var(--primary)}
+.diff-output{background:var(--surface);border-radius:12px;padding:16px;min-height:100px;font-family:'SF Mono',Consolas,monospace;font-size:.82rem;line-height:1.7;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.diff-line{padding:2px 8px;border-radius:4px;margin:1px 0;display:flex;gap:10px}
+.diff-line .ln{color:var(--text-dim);min-width:30px;text-align:right;user-select:none;flex-shrink:0}
+.diff-add{background:var(--add-bg);border-left:3px solid var(--add-border)}
+.diff-del{background:var(--del-bg);border-left:3px solid var(--del-border)}
+.diff-chg{background:var(--chg-bg);border-left:3px solid var(--chg-border)}
+.diff-eq{opacity:.6}
+.inline-add{background:#2ed57344;border-radius:2px;padding:0 2px}
+.inline-del{background:#e9456044;border-radius:2px;padding:0 2px;text-decoration:line-through}
+.legend{display:flex;gap:16px;justify-content:center;margin:12px 0;font-size:.75rem;color:var(--text-dim)}
+.legend span{display:flex;align-items:center;gap:4px}
+.legend .dot{width:10px;height:10px;border-radius:3px}
+.stats{text-align:center;color:var(--text-dim);font-size:.8rem;margin-bottom:12px}
+footer{text-align:center;margin-top:24px;color:var(--text-dim);font-size:.75rem}
+footer a{color:var(--primary);text-decoration:none}
+.empty-state{text-align:center;padding:40px;color:var(--text-dim)}
+@media(max-width:700px){.input-area{grid-template-columns:1fr}.input-area textarea{height:160px}}
+</style>
+</head>
+<body>
+<h1>📝 Diff Checker</h1>
+<p class="subtitle">Compare two texts — spot every difference</p>
+
+<div class="input-area">
+  <div><label>Original Text</label><textarea id="textA" placeholder="Paste original text here..."></textarea></div>
+  <div><label>Modified Text</label><textarea id="textB" placeholder="Paste modified text here..."></textarea></div>
+</div>
+
+<div class="toolbar">
+  <button class="btn btn-primary" onclick="runDiff()">Compare</button>
+  <button class="btn btn-secondary active" id="btnSide" onclick="setMode('side')">Line-by-line</button>
+  <button class="btn btn-secondary" id="btnInline" onclick="setMode('inline')">Inline</button>
+  <button class="btn btn-secondary" onclick="swapTexts()">⇄ Swap</button>
+  <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+</div>
+
+<div class="legend">
+  <span><span class="dot" style="background:var(--add-border)"></span> Added</span>
+  <span><span class="dot" style="background:var(--del-border)"></span> Removed</span>
+  <span><span class="dot" style="background:var(--chg-border)"></span> Changed</span>
+</div>
+
+<div class="stats" id="stats"></div>
+<div class="diff-output" id="output"><div class="empty-state">Enter two texts and click <b>Compare</b></div></div>
+
+<footer>100% client-side · No data sent to servers · <a href="https://github.com/maxmini0214/diff-checker">GitHub</a></footer>
+
+<script>
+let diffMode = 'side';
+
+function setMode(m) {
+  diffMode = m;
+  document.getElementById('btnSide').classList.toggle('active', m==='side');
+  document.getElementById('btnInline').classList.toggle('active', m==='inline');
+  runDiff();
+}
+
+function swapTexts() {
+  const a = document.getElementById('textA'), b = document.getElementById('textB');
+  [a.value, b.value] = [b.value, a.value];
+  runDiff();
+}
+
+function clearAll() {
+  document.getElementById('textA').value = '';
+  document.getElementById('textB').value = '';
+  document.getElementById('output').innerHTML = '<div class="empty-state">Enter two texts and click <b>Compare</b></div>';
+  document.getElementById('stats').textContent = '';
+}
+
+// Myers diff algorithm (LCS-based)
+function lcs(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, () => new Uint16Array(n+1));
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+  // backtrack
+  const ops = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i-1] === b[j-1]) {
+      ops.unshift({type:'eq', a:i-1, b:j-1});
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+      ops.unshift({type:'add', b:j-1});
+      j--;
+    } else {
+      ops.unshift({type:'del', a:i-1});
+      i--;
+    }
+  }
+  return ops;
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function inlineDiffWords(oldLine, newLine) {
+  const wa = oldLine.split(/(\s+)/), wb = newLine.split(/(\s+)/);
+  const ops = lcs(wa, wb);
+  let html = '';
+  for (const op of ops) {
+    if (op.type === 'eq') html += esc(wb[op.b]);
+    else if (op.type === 'del') html += `<span class="inline-del">${esc(wa[op.a])}</span>`;
+    else html += `<span class="inline-add">${esc(wb[op.b])}</span>`;
+  }
+  return html;
+}
+
+function runDiff() {
+  const a = document.getElementById('textA').value, b = document.getElementById('textB').value;
+  if (!a && !b) { clearAll(); return; }
+  const linesA = a.split('\n'), linesB = b.split('\n');
+  const ops = lcs(linesA, linesB);
+
+  let adds = 0, dels = 0, eqs = 0;
+  let html = '';
+
+  if (diffMode === 'side') {
+    // Merge del+add pairs into changes
+    const merged = [];
+    for (let k = 0; k < ops.length; k++) {
+      if (ops[k].type === 'del' && k+1 < ops.length && ops[k+1].type === 'add') {
+        merged.push({type:'chg', a: ops[k].a, b: ops[k+1].b});
+        k++;
+      } else merged.push(ops[k]);
+    }
+    for (const op of merged) {
+      if (op.type === 'eq') {
+        eqs++;
+        html += `<div class="diff-line diff-eq"><span class="ln">${op.a+1}</span><span>${esc(linesA[op.a])}&nbsp;</span></div>`;
+      } else if (op.type === 'del') {
+        dels++;
+        html += `<div class="diff-line diff-del"><span class="ln">${op.a+1}</span><span>- ${esc(linesA[op.a])}&nbsp;</span></div>`;
+      } else if (op.type === 'add') {
+        adds++;
+        html += `<div class="diff-line diff-add"><span class="ln">${op.b+1}</span><span>+ ${esc(linesB[op.b])}&nbsp;</span></div>`;
+      } else {
+        adds++; dels++;
+        html += `<div class="diff-line diff-chg"><span class="ln">${op.a+1}→${op.b+1}</span><span>${inlineDiffWords(linesA[op.a], linesB[op.b])}&nbsp;</span></div>`;
+      }
+    }
+  } else {
+    // Inline mode
+    for (const op of ops) {
+      if (op.type === 'eq') {
+        eqs++;
+        html += `<div class="diff-line diff-eq"><span class="ln">${op.a+1}</span><span>${esc(linesA[op.a])}&nbsp;</span></div>`;
+      } else if (op.type === 'del') {
+        dels++;
+        html += `<div class="diff-line diff-del"><span class="ln">${op.a+1}</span><span>- ${esc(linesA[op.a])}&nbsp;</span></div>`;
+      } else {
+        adds++;
+        html += `<div class="diff-line diff-add"><span class="ln">${op.b+1}</span><span>+ ${esc(linesB[op.b])}&nbsp;</span></div>`;
+      }
+    }
+  }
+
+  document.getElementById('output').innerHTML = html || '<div class="empty-state">Texts are identical ✓</div>';
+  document.getElementById('stats').textContent = `${adds} addition${adds!==1?'s':''} · ${dels} deletion${dels!==1?'s':''} · ${eqs} unchanged line${eqs!==1?'s':''}`;
+}
+</script>
+</body>
+</html>
